@@ -13,16 +13,17 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
+  id           String      @id @default(cuid())
+  name         String
+  email        String      @unique
+  password     String
   refreshToken String?
-  phone     String?
-  avatar    String?
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  phone        String?
+  avatar       String?
+  role         Role        @default(USER)
+  operations   Operation[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 model Category {
@@ -48,4 +49,41 @@ model Product {
 
   @@index([categoryId])
   @@index([title])
+}
+
+model Currency {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  name                String
+  symbol              String
+  exchangeRateFromUSD Float
+  operations          Operation[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+enum OperationType {
+  INCOME
+  EXPENSE
+}
+
+model Operation {
+  id            String        @id @default(cuid())
+  userId        String
+  type          OperationType
+  title         String
+  description   String?
+  amount        Float
+  currencyId    String
+  exchangeRate  Float
+  amountInUSD   Float
+  operationDate DateTime
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency      Currency      @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId, operationDate])
+  @@index([currencyId])
+  @@index([userId, type])
 }
