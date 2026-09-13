@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { Express, Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 // Swagger UI assets are loaded from a CDN because serverless platforms
@@ -46,7 +47,23 @@ async function bootstrap() {
   await app.listen(configService.get<number>('app.port', 3000));
 }
 
-// On Vercel the app is served through api/index.js instead of listening.
+let handlerPromise: Promise<Express> | undefined;
+
+// Serverless request handler. Vercel's NestJS preset builds this file as the
+// function for `/` and requires a default export; api/index.js reuses it.
+// The Nest app is created once per cold start and reused.
+export default async function handler(req: Request, res: Response) {
+  if (!handlerPromise) {
+    handlerPromise = createApp().then(async (app) => {
+      await app.init();
+      return app.getHttpAdapter().getInstance() as Express;
+    });
+  }
+  const instance = await handlerPromise;
+  instance(req, res);
+}
+
+// On Vercel the app is served through the handler instead of listening.
 if (!process.env.VERCEL) {
   void bootstrap();
 }
