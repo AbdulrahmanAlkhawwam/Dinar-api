@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { OperationType, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { CurrenciesService } from '../currencies/currencies.service';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateOperationDto } from './dto/create-operation.dto';
