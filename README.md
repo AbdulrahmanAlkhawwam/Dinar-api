@@ -57,6 +57,26 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Create the first admin
+
+Every `/api/v1/users` route requires an administrator's bearer token, and
+every account created through `/api/v1/auth/register` is a `USER`. To create
+the first administrator, register the account normally, then promote it:
+
+```bash
+npm run promote-admin -- someone@example.com
+```
+
+The script sets `role = ADMIN` for that email using the `DATABASE_URL` in
+your environment (or `.env`), prints the updated user, and exits non-zero if
+no user has that email. Point `DATABASE_URL` at the database you want to
+change, e.g. production, before running it. The user must sign in again to
+get a token carrying the new role.
+
+After that, admins manage other users (including promoting them) through the
+`/api/v1/users` endpoints. Admins cannot delete their own account or change
+their own role.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
