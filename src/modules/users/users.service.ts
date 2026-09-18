@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,15 +20,32 @@ const userSelect = {
   updatedAt: true,
 } satisfies Prisma.UserSelect;
 
+const PASSWORD_HASH_ROUNDS = 12;
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
+}
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(createUserDto: CreateUserDto) {
-    return this.prisma.user.create({
-      data: createUserDto,
-      select: userSelect,
-    });
+  async create(createUserDto: CreateUserDto) {
+    const password = await bcrypt.hash(
+      createUserDto.password,
+      PASSWORD_HASH_ROUNDS,
+    );
+    try {
+      return await this.prisma.user.create({
+        data: { ...createUserDto, password },
+        select: userSelect,
+      });
+    } catch (error) {
+      throw this.toConflictIfDuplicateEmail(error);
+    }
   }
 
   async findById(id: string) {
@@ -56,11 +78,25 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto) {
     await this.findById(id);
 
-    return this.prisma.user.update({
-      where: { id },
-      data: updateUserDto,
-      select: userSelect,
-    });
+    const data: Prisma.UserUpdateInput = { ...updateUserDto };
+    if (updateUserDto.password) {
+      data.password = await bcrypt.hash(
+        updateUserDto.password,
+        PASSWORD_HASH_ROUNDS,
+      );
+      // A new password ends every existing session for this user.
+      data.refreshToken = null;
+    }
+
+    try {
+      return await this.prisma.user.update({
+        where: { id },
+        data,
+        select: userSelect,
+      });
+    } catch (error) {
+      throw this.toConflictIfDuplicateEmail(error);
+    }
   }
 
   async remove(id: string) {
@@ -70,5 +106,12 @@ export class UsersService {
       where: { id },
       select: userSelect,
     });
+  }
+
+  private toConflictIfDuplicateEmail(error: unknown) {
+    if (isUniqueConstraintError(error)) {
+      return new ConflictException('An account with this email already exists');
+    }
+    return error;
   }
 }
